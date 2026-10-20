@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run the Milkshake Stand</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#121417; --yellow:#FFFF00; --paper:#FFFDF2; --panel:#FFFFFF; --muted:#5A5F66;
+  --good:#1E8E3E; --bad:#C62828; --sea:#2D9CDB; --line:#121417;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;line-height:1.5}
+.px{font-family:'Press Start 2P',monospace;letter-spacing:0}
+#app{max-width:980px;margin:0 auto;padding:12px 16px 24px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--ink);color:#fff;padding:12px 16px;border-radius:6px 6px 0 0}
+header h1{margin:0;font-size:14px;line-height:1.4;color:var(--yellow)}
+header .sub{font-size:12px;color:#C7C9CC}
+#hud{display:flex;flex-wrap:wrap;gap:6px 18px;background:var(--yellow);padding:8px 16px;font-size:10px;border-radius:0 0 6px 6px;margin-bottom:10px}
+#hud span b{font-weight:normal}
+#stage{position:relative;background:#7FD3F7;border:4px solid var(--ink);border-radius:4px;overflow:hidden;line-height:0}
+#scene{display:block;margin:0 auto;image-rendering:pixelated;image-rendering:crisp-edges}
+#ticker{position:absolute;left:8px;top:8px;line-height:1.6;font-size:9px;color:#fff;background:rgba(18,20,23,.75);padding:6px 8px;border-radius:3px;display:none}
+#skip{position:absolute;right:8px;top:8px;display:none}
+#panel{background:var(--panel);border:4px solid var(--ink);border-top:none;border-radius:0 0 4px 4px;padding:16px 18px 18px}
+h2{font-size:12px;margin:0 0 12px;line-height:1.6}
+h3{font-size:16px;margin:18px 0 8px}
+p{margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.card{border:2px solid var(--ink);border-radius:4px;padding:12px 14px;background:#fff}
+.card h4{margin:0 0 8px;font-size:15px}
+label{display:block;font-weight:600;margin:8px 0 2px}
+input[type=range]{width:100%;accent-color:var(--ink)}
+.val{font-family:'Press Start 2P',monospace;font-size:11px}
+.choice{display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border:2px solid transparent;border-radius:4px;cursor:pointer;margin:4px 0}
+.choice:hover{border-color:#E2E2DE}
+.choice input{margin-top:5px}
+.choice small{display:block;color:var(--muted)}
+.choice.disabled{opacity:.45;cursor:not-allowed}
+button{font-family:'Press Start 2P',monospace;font-size:11px;background:var(--yellow);color:var(--ink);border:3px solid var(--ink);padding:10px 14px;border-radius:4px;cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+button.ghost{background:#fff}
+button:focus-visible,input:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.event{background:#EAF2FB;border-left:6px solid #0A7AD9;padding:10px 12px;border-radius:4px;margin:0 0 14px}
+.note{background:#FFFDE7;border:2px solid var(--yellow);border-left-width:6px;padding:10px 12px;border-radius:4px;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:6px 8px;text-align:left;border:none}
+thead th{background:var(--ink);color:#fff;font-weight:600}
+tbody tr:nth-child(even) td{background:#F7F7F5}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.total td{font-weight:700;border-top:2px solid var(--ink)}
+.good{color:var(--good)} .bad{color:var(--bad)}
+.stars{color:#E0A800;letter-spacing:2px}
+#cvp{width:100%;max-width:520px;height:auto;border:2px solid var(--ink);border-radius:4px;background:#fff}
+.fb li{margin-bottom:6px}
+.badge{display:inline-block;font-family:'Press Start 2P',monospace;font-size:9px;background:var(--ink);color:var(--yellow);padding:6px 8px;border-radius:3px;margin:3px 4px 3px 0}
+.small{font-size:13px;color:var(--muted)}
+@media (max-width:560px){header h1{font-size:11px} #hud{font-size:8px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div><h1 class="px">RUN THE MILKSHAKE STAND</h1><div class="sub">ACC2200 · Module 1 · Cost-volume-profit in action</div></div>
+  </header>
+  <div id="hud" class="px" aria-live="polite"></div>
+  <div id="stage">
+    <canvas id="scene" width="320" height="180" role="img" aria-label="Pixel scene of your beachfront milkshake stand"></canvas>
+    <div id="ticker" class="px" aria-live="off"></div>
+    <button id="skip" class="ghost" type="button">Skip ▶▶</button>
+  </div>
+  <div id="panel" aria-live="polite"></div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================================
+   ASSET MANIFEST
+   Drop PNG files with these names into ./assets/. Any file that is missing
+   is drawn with a built-in placeholder, so the game always runs.
+   Base resolution 320x180, 16px tiles, transparent backgrounds.
+   Sprite sheets: frames laid out left to right; extra rows noted.
+   ========================================================================= */
+const ASSETS = {
+  bg_beach:      {file:'bg_beach.png',      w:320, h:180, frames:1},
+  waves:         {file:'waves.png',         w:320, h:16,  frames:4, fps:3},
+  palm:          {file:'palm.png',          w:32,  h:48,  frames:2, fps:1},
+  stand_l1:      {file:'stand_l1.png',      w:128, h:96,  frames:1},
+  stand_l2:      {file:'stand_l2.png',      w:128, h:96,  frames:1},
+  stand_l3:      {file:'stand_l3.png',      w:128, h:96,  frames:1},
+  stand_l4:      {file:'stand_l4.png',      w:128, h:96,  frames:1},
+  stand_fail:    {file:'stand_fail.png',    w:128, h:96,  frames:1},
+  stand_worn:    {file:'stand_worn.png',    w:128, h:96,  frames:1},  // optional overlay, used if there is no stand_fail
+  deco_seating:  {file:'deco_seating.png',  w:32,  h:32,  frames:1},
+  deco_sign:     {file:'deco_sign.png',     w:32,  h:32,  frames:1},
+  deco_blender:  {file:'deco_blender.png',  w:16,  h:16,  frames:2, fps:6},
+  deco_loyalty:  {file:'deco_loyalty.png',  w:16,  h:16,  frames:1},
+  vendor:        {file:'vendor.png',        w:16,  h:24,  frames:4, fps:4},
+  customer_a:    {file:'customer_a.png',    w:16,  h:24,  frames:4, rows:2, fps:8},
+  customer_b:    {file:'customer_b.png',    w:16,  h:24,  frames:4, rows:2, fps:8},
+  customer_c:    {file:'customer_c.png',    w:16,  h:24,  frames:4, rows:2, fps:8},
+  customer_d:    {file:'customer_d.png',    w:16,  h:24,  frames:4, rows:2, fps:8},
+  emotes:        {file:'emotes.png',        w:8,   h:8,   frames:3},
+  rain:          {file:'rain.png',          w:320, h:180, frames:2, fps:8},
+  cruise_ship:   {file:'cruise_ship.png',   w:96,  h:32,  frames:1}
+};
+const IMG = {};
+function loadAssets(){
+  return Promise.all(Object.entries(ASSETS).map(([k,a]) => new Promise(res => {
+    const im = new Image();
+    im.onload = () => { IMG[k] = im; res(); };
+    im.onerror = () => res();
+    im.src = 'assets/' + a.file;
+  })));
+}
+
+/* =========================================================================
+   GAME RULES AND NUMBERS
+   From the Module 1 scenario: fixed costs $4,780 per month; whole milk
+   $0.02 per ounce; 8 oz small at $6.00 and 12 oz large at $8.00.
+   Other variable costs are game assumptions, shown to the player.
+   ========================================================================= */
+const DAYS = 30, MONTHS = 6, BASE_FC = 4780, MIX_S = 0.6, GOAL = 25000;
+const VC_PARTS = { // per shake, standard supplier
+  small:[['Whole milk (8 oz × $0.02)',0.16],['Ice cream base',1.10],['Flavored straw',0.35],['Cup and lid',0.24],['Syrup and sugar',0.15]],
+  large:[['Whole milk (12 oz × $0.02)',0.24],['Ice cream base',1.65],['Flavored straw',0.35],['Cup and lid',0.31],['Syrup and sugar',0.20]]
+};
+const SUPPLIERS = {
+  budget:  {name:'Budget ice cream', adj:{small:-0.35,large:-0.50}, quality:0.82, note:'Cheaper, but icier shakes.'},
+  standard:{name:'Standard ice cream', adj:{small:0,large:0}, quality:1.00, note:'Good everyday quality.'},
+  premium: {name:'Premium Hawaiian ice cream', adj:{small:0.40,large:0.55}, quality:1.15, note:'Local and creamy. Costs more per shake.'}
+};
+const UPGRADES = {
+  blender: {name:'Extra blender', fc:300, vc:0, demand:0, cap:50, max:2, desc:'+50 shakes a day of capacity. Fixed cost +$300 a month.'},
+  seating: {name:'Shade umbrellas and seating', fc:250, vc:0, demand:0.12, cap:0, max:1, desc:'+12% visitors. Fixed cost +$250 a month.'},
+  sign:    {name:'Sign and social media', fc:200, vc:0, demand:0.10, cap:0, max:1, desc:'+10% visitors. Fixed cost +$200 a month.'},
+  loyalty: {name:'Loyalty punch cards', fc:0, vc:0.20, demand:0.08, cap:0, max:1, desc:'+8% visitors. Variable cost +$0.20 a shake (the free shakes).'}
+};
+const LEVELS = [
+  null,
+  {name:'Cart',         rentAdd:0,    visitors:70,  sprite:'stand_l1'},
+  {name:'Stand',        rentAdd:600,  visitors:95,  sprite:'stand_l2', need:{stars:3, cum:1500},  pitch:'A proper stand with a counter and a menu board.'},
+  {name:'Beach Shack',  rentAdd:1800, visitors:130, sprite:'stand_l3', need:{stars:4, cum:6000},  pitch:'A thatched shack right on the sand, with a third part-time employee.'},
+  {name:'Shake Bar',    rentAdd:3500, visitors:170, sprite:'stand_l4', need:{stars:5, cum:15000}, pitch:'A full shake bar with stools, a view, and a shift manager.'}
+];
+const EVENTS = [
+  null,
+  {title:'Opening month', text:'Your cart opens on the beach path. Word of mouth is just starting.', visitors:1.00},
+  {title:'Rainy week ahead', text:'The forecast shows a week of rain. Expect about 15% fewer visitors.', visitors:0.85, rain:true},
+  {title:'Cruise ships in port', text:'Two cruise ships dock this month. Expect about 25% more visitors.', visitors:1.25, ship:true},
+  {title:'Milk price rises', text:'Your dairy raises whole milk from $0.02 to $0.03 an ounce. Variable costs go up; visitors stay the same.', visitors:1.00, milk:0.03},
+  {title:'Surf competition', text:'A surf contest brings crowds. Expect about 15% more visitors.', visitors:1.15},
+  {title:'Holiday peak', text:'School holidays begin. Expect about 30% more visitors.', visitors:1.30}
+];
+const REF = {small:6, large:8}, ELASTIC = 2.2, BASE_CONV = 0.75, CAP_PER_BLENDER = 50;
+
+const S = { month:1, level:1, stars:2, blenders:1, owned:{blender:0,seating:0,sign:0,loyalty:0},
+            cum:0, history:[], badges:new Set(), phase:'intro', dec:null, res:null, predictionOk:false };
+
+const money = (x,d=0) => (x<0?'-$':'$') + Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const n0 = x => Math.round(x).toLocaleString('en-US');
+const starStr = k => '★'.repeat(k) + '☆'.repeat(5-k);
+
+function milkRate(m){ return EVENTS[m].milk || 0.02; }
+function vcPer(size, dec, m){
+  let v = VC_PARTS[size].reduce((a,p)=>a+p[1],0);
+  const oz = size==='small'?8:12;
+  v += (milkRate(m)-0.02)*oz;
+  v += SUPPLIERS[dec.supplier].adj[size];
+  if (S.owned.loyalty || dec.upgrade==='loyalty') v += UPGRADES.loyalty.vc;
+  return Math.round(v*100)/100;
+}
+function fixedCosts(dec){
+  let fc = BASE_FC + LEVELS[S.level].rentAdd;
+  for (const [k,u] of Object.entries(UPGRADES)){
+    const count = S.owned[k] + (dec && dec.upgrade===k ? 1 : 0);
+    fc += u.fc*count;
+  }
+  return fc;
+}
+function capacityPerDay(dec){ return CAP_PER_BLENDER * (S.blenders + (dec.upgrade==='blender'?1:0)); }
+function demandBoost(dec){
+  let b = 0;
+  for (const [k,u] of Object.entries(UPGRADES)){ const c = S.owned[k] + (dec.upgrade===k?1:0); b += u.demand*c; }
+  return b;
+}
+function breakEven(dec){
+  const cmS = dec.priceS - vcPer('small',dec,S.month), cmL = dec.priceL - vcPer('large',dec,S.month);
+  const wcm = MIX_S*cmS + (1-MIX_S)*cmL;
+  return {cmS, cmL, wcm, fc:fixedCosts(dec), be: wcm>0 ? Math.ceil(fixedCosts(dec)/wcm) : Infinity};
+}
+function simulate(dec){
+  const ev = EVENTS[S.month], q = SUPPLIERS[dec.supplier].quality;
+  const repF = 0.75 + 0.1*S.stars;
+  const visitors = LEVELS[S.level].visitors * ev.visitors * repF * (1+demandBoost(dec));
+  const conv = (p,ref) => Math.min(0.97, BASE_CONV * Math.pow(ref/p, ELASTIC) * q);
+  const wantS = visitors*MIX_S*conv(dec.priceS,REF.small), wantL = visitors*(1-MIX_S)*conv(dec.priceL,REF.large);
+  const want = wantS + wantL, cap = capacityPerDay(dec);
+  const served = Math.min(want, cap), ratio = want>0 ? served/want : 0;
+  const soldS = Math.round(wantS*ratio*DAYS), soldL = Math.round(wantL*ratio*DAYS);
+  const lost = Math.round((want-served)*DAYS), browsers = Math.round((visitors-want)*DAYS);
+  const vS = vcPer('small',dec,S.month), vL = vcPer('large',dec,S.month);
+  const rev = soldS*dec.priceS + soldL*dec.priceL, vc = soldS*vS + soldL*vL, fc = fixedCosts(dec);
+  const b = breakEven(dec);
+  return {visitors:Math.round(visitors*DAYS), soldS, soldL, sold:soldS+soldL, lost, browsers, cap:cap*DAYS,
+          vS, vL, rev, vc, cm:rev-vc, fc, oi:rev-vc-fc, be:b.be, wcm:b.wcm, cmS:b.cmS, cmL:b.cmL,
+          actualMix: (soldS+soldL)? soldS/(soldS+soldL) : MIX_S};
+}
+
+/* =========================================================================
+   SCENE RENDERING (pixel canvas)
+   ========================================================================= */
+const cv = document.getElementById('scene'), ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const GROUND = 150, STAND_X = 200;
+// where the vendor (v), blenders (b) and loyalty cards (l) sit, measured from the top-left of each 128x96 stand image
+const PROP_POS = {
+  1:{v:[60,31], b:[86,37], l:[40,40]},
+  2:{v:[28,48], b:[54,55], l:[70,58]},
+  3:{v:[80,52], b:[30,60], l:[46,62]},
+  4:{v:[30,51], b:[56,58], l:[74,60]}
+};
+let t0 = performance.now(), people = [], pops = [];
+const SKINS = ['customer_a','customer_b','customer_c','customer_d'];
+
+function frameOf(key, t){ const a = ASSETS[key]; if (!a.fps || a.frames<2) return 0; return Math.floor(t/1000*a.fps) % a.frames; }
+function sprite(key, x, y, frame=0, row=0, flip=false, k=1){
+  const a = ASSETS[key];
+  if (IMG[key]){
+    ctx.save();
+    if (flip){ ctx.translate(Math.round(x)+a.w*k, Math.round(y)); ctx.scale(-1,1); ctx.drawImage(IMG[key], frame*a.w, row*a.h, a.w, a.h, 0, 0, a.w*k, a.h*k); }
+    else ctx.drawImage(IMG[key], frame*a.w, row*a.h, a.w, a.h, Math.round(x), Math.round(y), a.w*k, a.h*k);
+    ctx.restore();
+  } else PH[key] && PH[key](Math.round(x), Math.round(y), frame, row);
+}
+const R = (x,y,w,h,c) => { ctx.fillStyle=c; ctx.fillRect(x,y,w,h); };
+/* Placeholders: simple pixel shapes so the game works before art arrives */
+const PH = {
+  bg_beach(){ R(0,0,320,70,'#7FD3F7'); R(0,40,320,30,'#A8E2FA'); R(0,70,320,44,'#2D9CDB'); R(0,112,320,68,'#F2D79B'); R(0,112,320,3,'#FFFFFF'); R(250,14,22,22,'#FFE45C'); },
+  waves(x,y,f){ for(let i=0;i<320;i+=24){ R((i+f*6)%336-8,y+4,12,2,'#D7F1FD'); } },
+  palm(x,y,f){ R(x+14,y+16,5,32,'#8B5A2B'); R(x+2,y+10+f,28,6,'#2E7D32'); R(x+8,y+4,16,6,'#43A047'); R(x+12,y+16,8,4,'#6D4C41'); },
+  stand_l1(x,y){ R(x+34,y+46,60,34,'#FFFFFF'); R(x+34,y+46,60,4,'#121417'); R(x+30,y+30,68,14,'#FFFF00'); for(let i=0;i<68;i+=12) R(x+30+i,y+30,6,14,'#121417'); R(x+40,y+80,10,10,'#121417'); R(x+78,y+80,10,10,'#121417'); },
+  stand_l2(x,y){ R(x+20,y+44,88,42,'#FFFFFF'); R(x+20,y+44,88,5,'#121417'); R(x+16,y+24,96,16,'#FFFF00'); for(let i=0;i<96;i+=12) R(x+16+i,y+24,6,16,'#121417'); R(x+44,y+52,40,14,'#121417'); R(x+48,y+56,32,2,'#FFFF00'); R(x+48,y+60,24,2,'#FFFF00'); },
+  stand_l3(x,y){ R(x+14,y+40,100,50,'#C68B59'); R(x+14,y+40,100,4,'#7A4E2D'); R(x+6,y+16,116,24,'#D9B26F'); for(let i=0;i<116;i+=8) R(x+6+i,y+36,4,6,'#B8893F'); R(x+30,y+52,68,14,'#FFFFFF'); R(x+34,y+56,60,2,'#121417'); },
+  stand_l4(x,y){ R(x+4,y+34,120,58,'#FFFFFF'); R(x+4,y+34,120,6,'#121417'); R(x,y+10,128,24,'#FFFF00'); for(let i=0;i<128;i+=16) R(x+i,y+10,8,24,'#121417'); R(x+16,y+48,96,16,'#7FD3F7'); R(x+20,y+80,8,12,'#121417'); R(x+100,y+80,8,12,'#121417'); },
+  stand_fail(x,y){ R(x+34,y+50,60,30,'#BDB6A8'); R(x+34,y+50,60,3,'#5A5F66'); R(x+46,y+30,4,20,'#5D4037'); R(x+30,y+26,36,10,'#9E9A6B'); R(x+56,y+30,10,8,'#5A5F66'); R(x+48,y+58,32,10,'#8D6E63'); R(x+52,y+61,24,4,'#C62828'); R(x+40,y+80,10,10,'#3E3E3E'); R(x+80,y+82,10,8,'#3E3E3E'); R(x+100,y+84,6,6,'#7A7A7A'); },
+  deco_seating(x,y){ R(x+15,y+4,2,24,'#5D4037'); R(x+2,y+2,28,6,'#E53935'); R(x+8,y+0,16,3,'#FFFFFF'); R(x+6,y+24,20,3,'#8D6E63'); R(x+6,y+27,2,5,'#5D4037'); R(x+24,y+27,2,5,'#5D4037'); },
+  deco_sign(x,y){ R(x+14,y+16,4,16,'#5D4037'); R(x+2,y+2,28,16,'#FFFF00'); R(x+4,y+4,24,12,'#121417'); R(x+7,y+7,18,2,'#FFFF00'); R(x+7,y+11,12,2,'#FFFF00'); },
+  deco_blender(x,y,f){ R(x+5,y+2,6,9,'#D7F1FD'); R(x+5,y+6+f,6,5-f,'#F48FB1'); R(x+4,y+11,8,5,'#121417'); },
+  deco_loyalty(x,y){ R(x+2,y+4,12,8,'#FFFFFF'); R(x+2,y+4,12,2,'#E53935'); R(x+4,y+8,2,2,'#121417'); R(x+7,y+8,2,2,'#121417'); R(x+10,y+8,2,2,'#121417'); },
+  vendor(x,y,f){ R(x+4,y+1,8,7,'#F1C27D'); R(x+3,y,10,3,'#121417'); R(x+3,y+8,10,10,'#FFFF00'); R(x+5,y+9,6,9,'#FFFFFF'); R(x+(f%2?1:12),y+10,3,3,'#F1C27D'); },
+  customer_a(x,y,f){ PH._cust(x,y,f,'#E53935','#3949AB','#8D5524'); },
+  customer_b(x,y,f){ PH._cust(x,y,f,'#43A047','#6D4C41','#F1C27D'); },
+  customer_c(x,y,f){ PH._cust(x,y,f,'#FB8C00','#1E88E5','#C68642'); },
+  customer_d(x,y,f){ PH._cust(x,y,f,'#8E24AA','#00897B','#E0AC69'); },
+  _cust(x,y,f,shirt,shorts,skin){ R(x+5,y+1,6,6,skin); R(x+4,y,8,2,'#3E2723'); R(x+4,y+7,8,8,shirt); R(x+4,y+15,8,4,shorts); const s=(f%2)?1:0; R(x+5-s,y+19,2,5,skin); R(x+9+s,y+19,2,5,skin); },
+  emotes(x,y,f){ if(f===0){R(x+1,y+2,2,2,'#E53935');R(x+5,y+2,2,2,'#E53935');R(x+1,y+3,6,2,'#E53935');R(x+2,y+5,4,1,'#E53935');R(x+3,y+6,2,1,'#E53935');}
+                  else if(f===1){R(x,y,8,8,'#121417');R(x+1,y+1,6,6,'#E53935');R(x+2,y+3,4,1,'#FFFFFF');}
+                  else {R(x+1,y+1,6,6,'#FFD54F');R(x+2,y,4,1,'#FFD54F');R(x+2,y+7,4,1,'#FFD54F');R(x+3,y+2,2,4,'#B8860B');} },
+  rain(x,y,f){ ctx.fillStyle='rgba(18,20,23,.18)'; ctx.fillRect(0,0,320,180); for(let i=0;i<60;i++){ const rx=(i*53+f*7)%320, ry=(i*37+f*13)%180; R(rx,ry,1,5,'#D7F1FD'); } },
+  cruise_ship(x,y){ R(x,y+18,96,10,'#FFFFFF'); R(x+6,y+28,84,4,'#121417'); R(x+16,y+8,60,10,'#FFFFFF'); for(let i=0;i<56;i+=8) R(x+20+i,y+11,4,3,'#2D9CDB'); R(x+40,y,10,8,'#E53935'); }
+};
+
+function standKey(){ return LEVELS[S.level].sprite; }
+function drawScene(now){
+  const t = now - t0;
+  sprite('bg_beach',0,0);
+  if (S.month && EVENTS[S.month] && EVENTS[S.month].ship && (S.phase==='run' || S.phase==='decide' || S.phase==='predict')) sprite('cruise_ship', 20, 74);
+  if (!IMG.bg_beach) sprite('waves',0,104,frameOf('waves',t));  // the drawn background already has surf
+  // palms drawn at 2x (64 x 96) so they read as full-size trees
+  sprite('palm', -8, GROUND-96+6, frameOf('palm',t), 0, false, 2);
+  sprite('palm', 274, GROUND-96+10, frameOf('palm',t+500), 0, true, 2);
+  // decorations
+  if (S.owned.seating || (S.dec&&S.dec.upgrade==='seating'&&S.phase==='run')) { sprite('deco_seating', 92, GROUND-30); sprite('deco_seating', 124, GROUND-26); }
+  if (S.owned.sign || (S.dec&&S.dec.upgrade==='sign'&&S.phase==='run')) sprite('deco_sign', STAND_X+62, GROUND-32);
+  // stand (a full "fail" image if provided; otherwise the normal stand with a worn overlay)
+  const sx = STAND_X-64, sy = GROUND-96+6;
+  const low = S.stars<=1;
+  let standImg = standKey();
+  if (low && (IMG.stand_fail || !IMG.stand_worn)) standImg = 'stand_fail';
+  sprite(standImg, sx, sy);
+  if (low && standImg!=='stand_fail') sprite('stand_worn', sx, sy);
+  // counter props: placeholders only sit on placeholder stands; real art is drawn on any stand
+  const realStand = !!IMG[standImg];
+  const show = k => IMG[k] || !realStand;
+  const P = PROP_POS[S.level] || PROP_POS[1];
+  if (show('vendor')) sprite('vendor', sx+P.v[0], sy+P.v[1], frameOf('vendor',t));
+  const bl = S.blenders + (S.dec&&S.dec.upgrade==='blender'&&S.phase==='run'?1:0);
+  if (show('deco_blender')) for (let i=0;i<bl;i++) sprite('deco_blender', sx+P.b[0]+i*14, sy+P.b[1], S.phase==='run'?frameOf('deco_blender',t):0);
+  if ((S.owned.loyalty || (S.dec&&S.dec.upgrade==='loyalty'&&S.phase==='run')) && show('deco_loyalty')) sprite('deco_loyalty', sx+P.l[0], sy+P.l[1]);
+  // people
+  people.sort((a,b)=>a.y-b.y);
+  for (const p of people){
+    const walking = p.state!=='wait';
+    const fr = walking ? Math.floor((t/1000)*ASSETS[p.skin].fps)%ASSETS[p.skin].frames : 0;
+    const dirLeft = p.vx<0;
+    const a = ASSETS[p.skin];
+    if (false) sprite(p.skin, p.x, p.y, fr, dirLeft?1:0);  // row 2 unused: row 1 is mirrored for walking left
+    else sprite(p.skin, p.x, p.y, fr, 0, dirLeft);
+  }
+  for (const e of pops) sprite('emotes', e.x, e.y, e.kind);
+  if (S.month && EVENTS[S.month] && EVENTS[S.month].rain && S.phase==='run') sprite('rain',0,0,frameOf('rain',t));
+}
+
+/* Month animation: customers walk to the counter; outcomes follow the simulated shares */
+let anim = null;
+function startRun(res, done){
+  const total = 15000; // ms for 30 days
+  const sprites = Math.min(70, Math.max(18, Math.round(res.visitors/90)));
+  const shares = {buy: res.sold/res.visitors, angry: res.lost/res.visitors};
+  people = []; pops = [];
+  anim = {start:performance.now(), total, spawned:0, sprites, shares, res, done, finished:false};
+  document.getElementById('ticker').style.display='block';
+  const sk = document.getElementById('skip'); sk.style.display='block'; sk.focus();
+}
+function stepRun(now, dt){
+  if (!anim) return;
+  const el = now - anim.start, frac = Math.min(1, el/anim.total);
+  const due = Math.floor(frac*anim.sprites);
+  while (anim.spawned < due){
+    const fromLeft = Math.random()<0.5, r = Math.random();
+    const outcome = r < anim.shares.buy ? 'buy' : (r < anim.shares.buy+anim.shares.angry ? 'angry' : 'browse');
+    people.push({skin:SKINS[(anim.spawned*7)%4], x: fromLeft?-16:322, y: GROUND-24+((anim.spawned*5)%9)-4,
+                 vx: fromLeft?0.035:-0.035, target: STAND_X-30+(anim.spawned%5)*6, state:'in', outcome, wait:0});
+    anim.spawned++;
+  }
+  for (const p of people){
+    if (p.state==='in'){
+      p.x += p.vx*dt;
+      if ((p.vx>0 && p.x>=p.target) || (p.vx<0 && p.x<=p.target)){ p.state='wait'; p.wait = p.outcome==='angry'?900:600; }
+    } else if (p.state==='wait'){
+      p.wait -= dt;
+      if (p.wait<=0){
+        pops.push({x:p.x+4, y:p.y-10, kind: p.outcome==='buy'?2:(p.outcome==='angry'?1:0), life:900});
+        p.state='out'; p.vx = (Math.random()<0.5?-1:1)*0.04;
+      }
+    } else p.x += p.vx*dt;
+  }
+  people = people.filter(p => p.x>-24 && p.x<344);
+  for (const e of pops){ e.life -= dt; e.y -= dt*0.01; }
+  pops = pops.filter(e=>e.life>0);
+  const day = Math.min(DAYS, Math.floor(frac*DAYS)+1);
+  document.getElementById('ticker').innerHTML =
+    `DAY ${day}/${DAYS}<br>SHAKES ${n0(anim.res.sold*frac)}<br>SALES ${money(anim.res.rev*frac)}`;
+  if (frac>=1 && !anim.finished) finishRun();
+}
+function finishRun(){
+  if (!anim || anim.finished) return;
+  anim.finished = true;
+  document.getElementById('ticker').style.display='none';
+  document.getElementById('skip').style.display='none';
+  const d = anim.done; anim = null; setTimeout(()=>{ people=[]; d(); }, 300);
+}
+document.getElementById('skip').addEventListener('click', finishRun);
+
+let last = performance.now();
+function loop(now){ const dt = Math.min(50, now-last); last = now; stepRun(now, dt); drawScene(now); requestAnimationFrame(loop); }
+
+function fitCanvas(){
+  cv.style.width = '100%'; cv.style.height = 'auto';
+}
+window.addEventListener('resize', fitCanvas);
+
+/* =========================================================================
+   UI
+   ========================================================================= */
+const panel = document.getElementById('panel');
+function hud(){
+  document.getElementById('hud').innerHTML =
+    `<span>MONTH <b>${Math.min(S.month,MONTHS)}/${MONTHS}</b></span><span>STORE <b>${LEVELS[S.level].name.toUpperCase()}</b></span>`+
+    `<span>PROFIT SO FAR <b>${money(S.cum)}</b></span><span>REPUTATION <b class="stars">${starStr(S.stars)}</b></span>`;
+}
+function costTable(){
+  const row = (a,b) => `<tr><td>${a[0]}</td><td class="num">${money(a[1],2)}</td><td>${b[0]}</td><td class="num">${money(b[1],2)}</td></tr>`;
+  let h = '<table><thead><tr><th>Small (8 oz)</th><th class="num">Cost</th><th>Large (12 oz)</th><th class="num">Cost</th></tr></thead><tbody>';
+  for (let i=0;i<5;i++) h += row(VC_PARTS.small[i], VC_PARTS.large[i]);
+  h += `<tr class="total"><td>Variable cost</td><td class="num">$2.00</td><td>Variable cost</td><td class="num">$2.75</td></tr></tbody></table>`;
+  return h;
+}
+
+function showIntro(){
+  S.phase='intro'; hud();
+  panel.innerHTML = `
+  <h2 class="px">WELCOME TO THE BEACH</h2>
+  <p>You've opened the beachfront milkshake stand from the Module 1 scenario. For the next six months, you make the calls: what to charge, which ice cream to buy, and what to invest in. Smart decisions build your reputation, and a strong reputation lets you grow from a cart to a full shake bar.</p>
+  <div class="note"><strong>Your goal:</strong> earn ${money(GOAL)} of total operating income in six months, and grow the stand as far as you can.</div>
+  <h3>Your starting numbers</h3>
+  <p>Fixed costs are <strong>${money(BASE_FC)} a month</strong> (rent, equipment loan, cleaning supplies, insurance, and two part-time employees). Prices start at <strong>$6.00</strong> for a small and <strong>$8.00</strong> for a large. Whole milk costs $0.02 an ounce; the other costs below are game assumptions.</p>
+  ${costTable()}
+  <p class="small" style="margin-top:8px">Each blender makes up to 50 shakes a day. About 60% of customers order a small. If the line is longer than your blenders can handle, customers leave.</p>
+  <h3>Each month</h3>
+  <ol><li>Set prices, choose a supplier, and choose one investment (or none).</li><li>Predict your break-even point. A close prediction earns a reputation star.</li><li>Watch the month play out, then read your contribution margin income statement.</li></ol>
+  <div class="row"><button type="button" id="go">START MONTH 1</button></div>`;
+  document.getElementById('go').onclick = showDecide;
+}
+
+function showDecide(){
+  S.phase='decide'; hud();
+  const ev = EVENTS[S.month];
+  const prev = S.dec || {priceS:6, priceL:8, supplier:'standard', upgrade:'none'};
+  const upHtml = Object.entries(UPGRADES).map(([k,u])=>{
+    const maxed = S.owned[k] >= u.max;
+    return `<label class="choice ${maxed?'disabled':''}"><input type="radio" name="up" value="${k}" ${maxed?'disabled':''}><span><strong>${u.name}</strong>${S.owned[k]?` (owned ${S.owned[k]})`:''}<small>${u.desc}</small></span></label>`;
+  }).join('');
+  panel.innerHTML = `
+  <h2 class="px">MONTH ${S.month}: YOUR DECISIONS</h2>
+  <div class="event"><strong>${ev.title}.</strong> ${ev.text}</div>
+  <div class="grid">
+    <div class="card"><h4>Prices</h4>
+      <label for="ps">Small shake: <span class="val" id="psv"></span></label>
+      <input id="ps" type="range" min="4" max="10" step="0.25" value="${prev.priceS}">
+      <label for="pl">Large shake: <span class="val" id="plv"></span></label>
+      <input id="pl" type="range" min="5" max="12" step="0.25" value="${prev.priceL}">
+      <p class="small" id="cmline" style="margin-top:8px"></p>
+    </div>
+    <div class="card"><h4>Ice cream supplier</h4>
+      ${Object.entries(SUPPLIERS).map(([k,s])=>`<label class="choice"><input type="radio" name="sup" value="${k}" ${prev.supplier===k?'checked':''}><span><strong>${s.name}</strong><small>${s.note} Variable cost ${s.adj.small>=0?'+':''}${money(s.adj.small,2)} small, ${s.adj.large>=0?'+':''}${money(s.adj.large,2)} large.</small></span></label>`).join('')}
+    </div>
+    <div class="card"><h4>Invest this month (choose one)</h4>
+      <label class="choice"><input type="radio" name="up" value="none" checked><span><strong>No new investment</strong><small>Keep fixed costs where they are.</small></span></label>
+      ${upHtml}
+    </div>
+  </div>
+  <div class="row"><button type="button" id="next">NEXT: PREDICT BREAK-EVEN</button></div>`;
+  const ps = document.getElementById('ps'), pl = document.getElementById('pl');
+  const upd = () => {
+    document.getElementById('psv').textContent = money(+ps.value,2);
+    document.getElementById('plv').textContent = money(+pl.value,2);
+    const dec = readDec();
+    const b = breakEven(dec);
+    document.getElementById('cmline').innerHTML = `Contribution margin per shake: small <strong>${money(b.cmS,2)}</strong>, large <strong>${money(b.cmL,2)}</strong>. Fixed costs this month: <strong>${money(b.fc)}</strong>.`;
+  };
+  panel.querySelectorAll('input').forEach(i=>i.addEventListener('input',upd));
+  upd();
+  document.getElementById('next').onclick = () => { S.dec = readDec(); showPredict(); };
+}
+function readDec(){
+  return { priceS:+document.getElementById('ps').value, priceL:+document.getElementById('pl').value,
+           supplier:(panel.querySelector('input[name=sup]:checked')||{value:'standard'}).value,
+           upgrade:(panel.querySelector('input[name=up]:checked')||{value:'none'}).value };
+}
+
+function showPredict(){
+  S.phase='predict'; hud();
+  const d = S.dec, b = breakEven(d);
+  const vS = vcPer('small',d,S.month), vL = vcPer('large',d,S.month);
+  panel.innerHTML = `
+  <h2 class="px">PREDICT YOUR BREAK-EVEN</h2>
+  <p>Before the month starts, work out how many shakes you must sell to cover this month's costs. Assume 60% small and 40% large.</p>
+  <table><thead><tr><th></th><th class="num">Small</th><th class="num">Large</th></tr></thead><tbody>
+    <tr><td>Price</td><td class="num">${money(d.priceS,2)}</td><td class="num">${money(d.priceL,2)}</td></tr>
+    <tr><td>Variable cost per shake</td><td class="num">${money(vS,2)}</td><td class="num">${money(vL,2)}</td></tr>
+    <tr><td>Sales mix</td><td class="num">60%</td><td class="num">40%</td></tr>
+    <tr class="total"><td>Fixed costs this month</td><td class="num" colspan="2">${money(b.fc)}</td></tr>
+  </tbody></table>
+  <label for="guess" style="margin-top:14px">Break-even point (total shakes this month)</label>
+  <input id="guess" type="number" min="0" step="1" inputmode="numeric" style="font-size:16px;padding:8px;width:180px;border:2px solid #121417;border-radius:4px">
+  <details style="margin-top:10px"><summary style="cursor:pointer">Need a hint?</summary>
+    <p style="margin-top:8px">Weighted contribution margin = 60% × small margin + 40% × large margin. Break-even shakes = fixed costs ÷ weighted contribution margin. Round up.</p></details>
+  <div class="row"><button type="button" id="chk">CHECK AND OPEN THE STAND</button><button type="button" class="ghost" id="skipq">Skip prediction</button></div>
+  <div id="fbq"></div>`;
+  const go = (guess) => {
+    let msg;
+    if (!isFinite(b.be)) { S.predictionOk=false; msg = `<p class="bad">At these prices, each shake loses money, so you can't break even. Raise prices or cut variable costs.</p>`; }
+    else if (guess===null){ S.predictionOk=false; msg = `<p>Break-even this month: <strong>${n0(b.be)} shakes</strong>.</p>`; }
+    else {
+      const ok = Math.abs(guess-b.be)/b.be <= 0.05;
+      S.predictionOk = ok;
+      msg = ok ? `<p class="good"><strong>Sharp analysis!</strong> Break-even is ${n0(b.be)} shakes (${money(b.fc)} ÷ ${money(b.wcm,2)}). You earn a reputation star.</p>`
+               : `<p class="bad"><strong>Not quite.</strong> Break-even is ${n0(b.be)} shakes: ${money(b.fc)} ÷ (60% × ${money(b.cmS,2)} + 40% × ${money(b.cmL,2)}) = ${money(b.fc)} ÷ ${money(b.wcm,2)}.</p>`;
+    }
+    document.getElementById('fbq').innerHTML = msg + `<p class="small">That's about ${isFinite(b.be)?n0(b.be/DAYS):'—'} shakes a day. Your blenders can make ${n0(capacityPerDay(d))} a day.</p>`;
+    panel.querySelectorAll('button').forEach(x=>x.disabled=true);
+    setTimeout(runMonth, 2200);
+  };
+  document.getElementById('chk').onclick = () => { const v = document.getElementById('guess').value; go(v===''?null:+v); };
+  document.getElementById('skipq').onclick = () => go(null);
+  document.getElementById('guess').focus();
+}
+
+function runMonth(){
+  S.phase='run'; hud();
+  const res = simulate(S.dec); S.res = res;
+  panel.innerHTML = `<h2 class="px">MONTH ${S.month} IS UNDERWAY…</h2><p>Watch your customers. A coin means a sale, a heart means a happy browser who didn't buy, and an angry face means someone gave up on the line.</p>`;
+  startRun(res, showReport);
+}
+
+function showReport(){
+  S.phase='report';
+  const r = S.res, d = S.dec;
+  // commit upgrade
+  if (d.upgrade!=='none'){ S.owned[d.upgrade]++; if (d.upgrade==='blender') S.blenders++; }
+  // reputation
+  const notes = [], fb = [];
+  let delta = 0;
+  if (r.oi>0){ delta++; notes.push('+1 profitable month'); } else { delta--; notes.push('−1 operating loss'); }
+  if (S.predictionOk){ delta++; notes.push('+1 accurate break-even prediction'); S.badges.add('Sharp Analyst'); }
+  const lostPct = r.lost/(r.sold+r.lost||1);
+  if (lostPct>0.12){ delta--; notes.push('−1 long lines'); }
+  if (d.supplier==='budget'){ delta--; notes.push('−1 reviews mention icy shakes'); }
+  if (d.supplier==='premium' && r.oi>0){ S.badges.add('Quality First'); }
+  const before = S.stars;
+  S.stars = Math.max(0, Math.min(5, S.stars+delta));
+  S.cum += r.oi;
+  S.history.push({m:S.month, level:LEVELS[S.level].name, sold:r.sold, be:r.be, oi:r.oi, stars:S.stars});
+  if (r.oi>=2500) S.badges.add('Big Month');
+  // feedback on decisions
+  const diff = r.sold - r.be;
+  if (isFinite(r.be)) fb.push(diff>=0 ? `You sold <strong>${n0(r.sold)}</strong> shakes, <strong>${n0(diff)} above</strong> break-even. Each shake past break-even added about ${money(r.wcm,2)} to operating income.`
+                                  : `You sold <strong>${n0(r.sold)}</strong> shakes, <strong>${n0(-diff)} short</strong> of break-even, so fixed costs were not covered.`);
+  if (lostPct>0.12) fb.push(`About <strong>${n0(r.lost)}</strong> customers left because the line was too long. Your blenders, not demand, limited sales. An extra blender raises capacity, but it also raises fixed costs.`);
+  if (d.priceS>7.25 || d.priceL>9.5) fb.push(`High prices raised your margin per shake but turned away about <strong>${n0(r.browsers)}</strong> visitors. Compare the extra margin with the lost volume.`);
+  if (d.priceS<5.5 || d.priceL<7.5) fb.push(`Low prices brought in buyers, but each small shake contributed only ${money(r.cmS,2)}. A lower margin means a higher break-even point.`);
+  if (d.supplier==='budget') fb.push('The budget ice cream cut variable costs, but customers noticed. Cheaper inputs can cost you reputation and future visitors.');
+  if (d.upgrade!=='none'){ const u = UPGRADES[d.upgrade]; fb.push(`Your ${u.name.toLowerCase()} ${u.fc?`added ${money(u.fc)} to monthly fixed costs`:`added ${money(u.vc,2)} to the variable cost of each shake`}. It stays with you for the rest of the game.`); }
+  if (EVENTS[S.month].milk) fb.push('The milk price increase raised variable costs on every shake, so your contribution margin and break-even point changed even though fixed costs did not.');
+
+  const lv = LEVELS[S.level+1];
+  const canExpand = S.month<MONTHS && lv && S.stars>=lv.need.stars && S.cum>=lv.need.cum;
+  hud();
+  panel.innerHTML = `
+  <h2 class="px">MONTH ${S.month} RESULTS</h2>
+  <div class="grid">
+    <div>
+      <h3 style="margin-top:0">Contribution margin income statement</h3>
+      <table><tbody>
+        <tr><td>Sales revenue (${n0(r.soldS)} small, ${n0(r.soldL)} large)</td><td class="num">${money(r.rev)}</td></tr>
+        <tr><td>Less variable costs</td><td class="num">(${money(r.vc)})</td></tr>
+        <tr class="total"><td>Contribution margin</td><td class="num">${money(r.cm)}</td></tr>
+        <tr><td>Less fixed costs</td><td class="num">(${money(r.fc)})</td></tr>
+        <tr class="total"><td>Operating income</td><td class="num ${r.oi>=0?'good':'bad'}">${money(r.oi)}</td></tr>
+      </tbody></table>
+      <p class="small" style="margin-top:8px">Contribution margin ratio: ${(r.rev? r.cm/r.rev*100:0).toFixed(1)}%. Break-even: ${isFinite(r.be)?n0(r.be)+' shakes':'not reachable'}. Capacity: ${n0(r.cap)} shakes.</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Your CVP chart</h3>
+      <canvas id="cvp" width="520" height="300" aria-label="CVP chart: revenue and total cost lines with break-even and actual sales marked"></canvas>
+    </div>
+  </div>
+  <h3>Reputation ${starStr(before)} → <span class="stars">${starStr(S.stars)}</span></h3>
+  <p class="small">${notes.join(' · ')}</p>
+  <h3>What happened</h3>
+  <ul class="fb">${fb.map(x=>`<li>${x}</li>`).join('')}</ul>
+  ${canExpand ? `<div class="note"><strong>Expansion offer: ${lv.name}.</strong> ${lv.pitch} Rent rises by ${money(lv.rentAdd-LEVELS[S.level].rentAdd)} a month, so fixed costs grow, but more visitors come by. Moving outside your current relevant range changes every number in your CVP analysis.</div>` : ''}
+  <div class="row">
+    ${canExpand ? `<button type="button" id="expand">EXPAND TO ${lv.name.toUpperCase()}</button><button type="button" class="ghost" id="stay">Stay as ${LEVELS[S.level].name}</button>`
+                : `<button type="button" id="stay">${S.month<MONTHS?'NEXT MONTH':'SEE FINAL RESULTS'}</button>`}
+  </div>`;
+  drawCVP(r);
+  const next = () => { S.month++; if (S.month>MONTHS) showEnd(); else showDecide(); };
+  if (canExpand) document.getElementById('expand').onclick = () => { S.level++; S.badges.add('Growing Up'); next(); };
+  document.getElementById('stay').onclick = next;
+  document.getElementById(canExpand?'expand':'stay').focus();
+}
+
+function drawCVP(r){
+  const c = document.getElementById('cvp'), g = c.getContext('2d');
+  const W=c.width, H=c.height, L=84, B=36, T=24, Rr=14;
+  const maxU = Math.max(r.cap, r.sold, isFinite(r.be)?r.be:0)*1.1 || 100;
+  const price = r.sold ? r.rev/r.sold : (MIX_S*S.dec.priceS+(1-MIX_S)*S.dec.priceL);
+  const vcu = r.sold ? r.vc/r.sold : price - r.wcm;
+  const maxY = Math.max(price*maxU, r.fc+vcu*maxU)*1.05;
+  const X = u => L + (u/maxU)*(W-L-Rr), Y = v => H-B - (v/maxY)*(H-B-T);
+  g.clearRect(0,0,W,H); g.font='12px Segoe UI, sans-serif';
+  // profit and loss areas
+  if (isFinite(r.be) && r.be<maxU){
+    g.fillStyle='rgba(198,40,40,.10)'; g.beginPath(); g.moveTo(X(0),Y(0)); g.lineTo(X(0),Y(r.fc)); g.lineTo(X(r.be),Y(r.fc+vcu*r.be)); g.closePath(); g.fill();
+    g.fillStyle='rgba(30,142,62,.12)'; g.beginPath(); g.moveTo(X(r.be),Y(price*r.be)); g.lineTo(X(maxU),Y(price*maxU)); g.lineTo(X(maxU),Y(r.fc+vcu*maxU)); g.closePath(); g.fill();
+  }
+  g.strokeStyle='#121417'; g.lineWidth=1; g.beginPath(); g.moveTo(L,T); g.lineTo(L,H-B); g.lineTo(W-Rr,H-B); g.stroke();
+  g.fillStyle='#121417'; g.fillText('Shakes sold', W/2-30, H-8); g.save(); g.translate(12,H/2+28); g.rotate(-Math.PI/2); g.fillText('US dollars',0,0); g.restore();
+  for (let i=0;i<=4;i++){ const u=maxU*i/4, v=maxY*i/4; g.fillText(n0(u), X(u)-12, H-B+14); g.fillText(money(v), 22, Y(v)+4); }
+  const line=(x1,y1,x2,y2,col,w)=>{g.strokeStyle=col;g.lineWidth=w;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();};
+  line(X(0),Y(r.fc),X(maxU),Y(r.fc+vcu*maxU),'#C62828',3);
+  line(X(0),Y(0),X(maxU),Y(price*maxU),'#1E8E3E',3);
+  g.setLineDash([4,4]); line(X(r.cap),T,X(r.cap),H-B,'#5A5F66',1); g.setLineDash([]);
+  g.fillStyle='#5A5F66'; g.fillText('Capacity', X(r.cap)-54, H-B-8);
+  g.fillStyle='#C62828'; g.fillText('Total cost', X(maxU*0.62)+6, Y(r.fc+vcu*maxU*0.62)+18);
+  g.fillStyle='#1E8E3E'; g.fillText('Revenue', X(maxU*0.62)-60, Y(price*maxU*0.62)-8);
+  if (isFinite(r.be) && r.be<maxU){ g.fillStyle='#121417'; g.beginPath(); g.arc(X(r.be),Y(price*r.be),5,0,7); g.fill(); g.fillText('Break-even '+n0(r.be), X(r.be)+8, Y(price*r.be)+16); }
+  g.fillStyle='#0A7AD9'; g.beginPath(); g.arc(X(r.sold),Y(price*r.sold),6,0,7); g.fill(); g.fillText('You: '+n0(r.sold), X(r.sold)+10, Y(price*r.sold)+4);
+}
+
+function showEnd(){
+  S.phase='end'; S.month = MONTHS; hud();
+  if (S.cum>=GOAL) S.badges.add('Goal Reached');
+  const rank = S.cum>=GOAL && S.level>=4 ? 'Beach Legend' : S.cum>=GOAL ? 'Profit Pro' : S.cum>0 ? 'Steady Shaker' : 'Back to the Drawing Board';
+  panel.innerHTML = `
+  <h2 class="px">SIX MONTHS LATER: ${rank.toUpperCase()}</h2>
+  <p>Total operating income: <strong class="${S.cum>=0?'good':'bad'}">${money(S.cum)}</strong> (goal ${money(GOAL)}). Final store: <strong>${LEVELS[S.level].name}</strong>. Reputation: <span class="stars">${starStr(S.stars)}</span></p>
+  <p>${[...S.badges].map(b=>`<span class="badge">${b.toUpperCase()}</span>`).join('') || '<span class="small">No badges yet. Try again!</span>'}</p>
+  <table><thead><tr><th>Month</th><th>Store</th><th class="num">Shakes sold</th><th class="num">Break-even</th><th class="num">Operating income</th><th>Reputation</th></tr></thead><tbody>
+  ${S.history.map(h=>`<tr><td>${h.m}</td><td>${h.level}</td><td class="num">${n0(h.sold)}</td><td class="num">${isFinite(h.be)?n0(h.be):'—'}</td><td class="num ${h.oi>=0?'good':'bad'}">${money(h.oi)}</td><td class="stars">${starStr(h.stars)}</td></tr>`).join('')}
+  </tbody></table>
+  <h3>Think about it</h3>
+  <ul class="fb"><li>Which decision raised your contribution margin the most, and which one raised your break-even point?</li>
+  <li>When did capacity, not demand, limit your sales? What did that cost you?</li>
+  <li>Expanding moved you into a new relevant range. How did fixed costs and break-even change when you grew?</li></ul>
+  <div class="row"><button type="button" id="again">PLAY AGAIN</button></div>`;
+  document.getElementById('again').onclick = () => {
+    Object.assign(S,{month:1, level:1, stars:2, blenders:1, owned:{blender:0,seating:0,sign:0,loyalty:0}, cum:0, history:[], badges:new Set(), dec:null, res:null});
+    showIntro();
+  };
+}
+
+loadAssets().then(()=>{ fitCanvas(); showIntro(); requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
